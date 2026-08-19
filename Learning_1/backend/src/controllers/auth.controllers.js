@@ -27,7 +27,7 @@ async function userRegister(req,res){
 
 
 const token=jwt.sign({
-    id:user._id},process.env.SECRET_KEY)
+    id:user._id},process.env.JWT_SECRET,{expiresIn:"1h"})
     res.cookie("token",token)
 
     const userObj=user.toObject()
