@@ -69,21 +69,25 @@ async function refreshToken(req,res){
       const refreshToken=req.cookies.refreshToken
 
     if(!refreshToken){
-        return res.error(409).json({Message:"Unauthorized Access"})
+        return res.error(401).json({Message:"Unauthorized Access"})
     }
-
 
 try {
     const decoded=jwt.verify(refreshToken,process.env.JWT_SECRET)
-    
-
 
     const accessToken=jwt.sign({
         id:decoded.id
     },process.env.JWT_SECRET,{expiresIn:"15m"})
 
+    const newRefreshToken=jwt.sign({id:decoded.id},process.env.JWT_SECRET,{expiresIn:"7d"})
+    console.log(refreshToken)
 
-    return res.status(200).json({message:"Access token Generated"},decoded)
+    res.cookie("refreshToken",newRefreshToken,{httpOnly: true,
+    secure: false,
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000})
+
+    return res.status(200).json({message:"Access token Generated",accessToken})
 }
 catch(error){
      return res.status(404).json({message:"Invalid or exipred token"})
