@@ -8,7 +8,7 @@ async function userRegister(req,res){
 
     const isalreadyregisted=await userModel.findOne({
         $or:[
-            {username},{email}
+            {username},  {email}
         ]
     })
 
