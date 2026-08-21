@@ -54,7 +54,7 @@ async function userRegister(req, res) {
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: true,
+    secure: false,
     sameSite: "strict",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
@@ -66,38 +66,6 @@ async function userRegister(req, res) {
     user: userObj,
     accessToken,
   });
-}
-
-async function logOut(req, res) {
-    const refreshToken=req.cookie.refreshToken
-
-    if(!refreshToken){
-        return res.status(400).json({message:"Refresh Token not found"})
-    }
-  
-    const refreshTokenHash= crypto.createHash("sah256").update(refreshToken).digest("hex")
-
-     
-    const session=await SessionModel.findOne({
-        refreshTokenHash,
-        revoke:false
-    })
-
-    if(!session){
-       return res.status(400).json({Message:"Session not found"})
-    }
-
-
-    session.revoke=true
-    await session.save();
-
-    res.clearCookie("refreshToken")
-
-    res.status(200).json({
-        message:"Logged out Successfully"
-    })
-
-
 }
 
 async function refreshToken(req, res) {
@@ -118,6 +86,7 @@ async function refreshToken(req, res) {
     const session = await SessionModel.findOne({
       refreshTokenHash: oldRefreshTokenHash,
       userId: decoded.id,
+      revoked:false
     });
 
     if (!session) {
@@ -161,6 +130,41 @@ async function refreshToken(req, res) {
       .json({ message: "Access token Generated", accessToken });
   } catch (error) {
     return res.status(404).json({ message: "Invalid or exipred token" });
+  }
+}
+
+async function logOut(req, res) {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    return res.status(400).json({ message: "Refresh Token not found" });
+  }
+
+  try {
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await SessionModel.findOne({
+      refreshTokenHash,
+      revoked: false,
+    });
+
+    if (!session) {
+      return res.status(400).json({ Message: "Session not found" });
+    }
+
+    session.revoked = true;
+    await session.save();
+
+    res.clearCookie("refreshToken");
+
+    res.status(200).json({
+      message: "Logged out Successfully",
+    });
+  } catch (error) {
+    console.error(error);
   }
 }
 

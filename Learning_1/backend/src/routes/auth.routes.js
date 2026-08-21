@@ -9,8 +9,8 @@ import getMe  from "../controllers/user.controllers.js"
 const router=Router()
 
 router.post("/register",userRegister)
-router.get("/logout",logOut)
+router.post("/logout",logOut)
 router.get("/me",getMe)
-router.get('/refreshToken',refreshToken)
+router.post('/refreshToken',refreshToken)
 
 export default router

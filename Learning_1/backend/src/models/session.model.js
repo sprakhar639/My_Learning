@@ -19,7 +19,7 @@ const sessionSchema = new mongoose.Schema(
       type: String,
       required: [true, "User agent is required"],
     },
-    revoke: {
+    revoked: {
       type: Boolean,
       default: "false",
     },
