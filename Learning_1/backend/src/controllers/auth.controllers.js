@@ -68,6 +68,37 @@ async function userRegister(req, res) {
   });
 }
 
+async function logOut(req, res) {
+    const refreshToken=req.cookie.refreshToken
+
+    if(!refreshToken){
+        return res.status(400).json({message:"Refresh Token not found"})
+    }
+  
+    const refreshTokenHash= crypto.createHash("sah256").update(refreshToken).digest("hex")
+
+     
+    const session=await SessionModel.findOne({
+        refreshTokenHash,
+        revoke:false
+    })
+
+    if(!session){
+       return res.status(400).json({Message:"Session not found"})
+    }
+
+
+    session.revoke=true
+    await session.save();
+
+    res.clearCookie("refreshToken")
+
+    res.status(200).json({
+        message:"Logged out Successfully"
+    })
+
+
+}
 
 async function refreshToken(req, res) {
   const oldrefreshToken = req.cookies.refreshToken;
@@ -101,7 +132,6 @@ async function refreshToken(req, res) {
       { expiresIn: "7d" },
     );
 
-
     const newRefreshTokenHash = crypto
       .createHash("sha256")
       .update(newRefreshToken)
@@ -113,7 +143,7 @@ async function refreshToken(req, res) {
     const accessToken = jwt.sign(
       {
         id: decoded.id,
-        sessionId:session.id
+        sessionId: session.id,
       },
       process.env.JWT_SECRET,
       { expiresIn: "15m" },
@@ -134,4 +164,4 @@ async function refreshToken(req, res) {
   }
 }
 
-export { userRegister, refreshToken };
+export { userRegister, refreshToken, logOut };

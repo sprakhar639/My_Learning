@@ -1,13 +1,15 @@
 import {Router} from 'express'
 
-import {userRegister,refreshToken} from "../controllers/auth.controllers.js"
+import {userRegister,refreshToken,logOut} from "../controllers/auth.controllers.js"
 import getMe  from "../controllers/user.controllers.js"
+ 
 
 
 
 const router=Router()
 
 router.post("/register",userRegister)
+router.get("/logout",logOut)
 router.get("/me",getMe)
 router.get('/refreshToken',refreshToken)
 
