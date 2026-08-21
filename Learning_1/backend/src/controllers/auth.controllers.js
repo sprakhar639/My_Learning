@@ -1,6 +1,8 @@
 import userModel from "../models/user.model.js";
+import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import SessionModel from "../models/session.model.js";
 
 async function userRegister(req, res) {
   const { username, email, password } = req.body;
@@ -21,19 +23,6 @@ async function userRegister(req, res) {
     password: hash,
   });
 
-
-
-
-  const accessToken = jwt.sign(
-    {
-      id: user._id,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "15m" },
-  );
-
-
-
   const refreshToken = jwt.sign(
     {
       id: user._id,
@@ -42,8 +31,26 @@ async function userRegister(req, res) {
     { expiresIn: "7d" },
   );
 
+  const refreshTokenHash = crypto
+    .createHash("sha256")
+    .update(refreshToken)
+    .digest("hex");
 
+  const session = await SessionModel.create({
+    userId: user._id,
+    refreshTokenHash,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
 
+  const accessToken = jwt.sign(
+    {
+      id: user._id,
+      sessionId: session.id,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" },
+  );
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
@@ -52,49 +59,79 @@ async function userRegister(req, res) {
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
-
-
   const userObj = user.toObject();
   delete userObj.password;
   return res.status(201).json({
     message: "User registered successfully",
     user: userObj,
-    accessToken
+    accessToken,
   });
 }
 
 
+async function refreshToken(req, res) {
+  const oldrefreshToken = req.cookies.refreshToken;
 
-async function refreshToken(req,res){
-      const refreshToken=req.cookies.refreshToken
+  if (!oldrefreshToken) {
+    return res.status(401).json({ Message: "Unauthorized Access" });
+  }
 
-    if(!refreshToken){
-        return res.error(401).json({Message:"Unauthorized Access"})
+  try {
+    const decoded = jwt.verify(oldrefreshToken, process.env.JWT_SECRET);
+
+    const oldRefreshTokenHash = crypto
+      .createHash("sha256")
+      .update(oldrefreshToken)
+      .digest("hex");
+
+    const session = await SessionModel.findOne({
+      refreshTokenHash: oldRefreshTokenHash,
+      userId: decoded.id,
+    });
+
+    if (!session) {
+      return res.status(401).json({
+        message: "Invalid refresh token",
+      });
     }
 
-try {
-    const decoded=jwt.verify(refreshToken,process.env.JWT_SECRET)
+    const newRefreshToken = jwt.sign(
+      { id: decoded.id },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" },
+    );
 
-    const accessToken=jwt.sign({
-        id:decoded.id
-    },process.env.JWT_SECRET,{expiresIn:"15m"})
 
-    const newRefreshToken=jwt.sign({id:decoded.id},process.env.JWT_SECRET,{expiresIn:"7d"})
-    console.log(refreshToken)
+    const newRefreshTokenHash = crypto
+      .createHash("sha256")
+      .update(newRefreshToken)
+      .digest("hex");
 
-    res.cookie("refreshToken",newRefreshToken,{httpOnly: true,
-    secure: false,
-    sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000})
+    session.refreshTokenHash = newRefreshTokenHash;
+    await session.save();
 
-    return res.status(200).json({message:"Access token Generated",accessToken})
+    const accessToken = jwt.sign(
+      {
+        id: decoded.id,
+        sessionId:session.id
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" },
+    );
+
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res
+      .status(200)
+      .json({ message: "Access token Generated", accessToken });
+  } catch (error) {
+    return res.status(404).json({ message: "Invalid or exipred token" });
+  }
 }
-catch(error){
-     return res.status(404).json({message:"Invalid or exipred token"})
-}
-}
 
-
-
-
-export {userRegister,refreshToken};
+export { userRegister, refreshToken };

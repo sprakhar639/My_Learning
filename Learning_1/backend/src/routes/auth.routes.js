@@ -1,7 +1,7 @@
 import {Router} from 'express'
 
 import {userRegister,refreshToken} from "../controllers/auth.controllers.js"
-import getMe  from "../controllers/user.controller.js"
+import getMe  from "../controllers/user.controllers.js"
 
 
 
