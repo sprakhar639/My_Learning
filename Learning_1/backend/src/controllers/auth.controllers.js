@@ -72,7 +72,7 @@ async function refreshToken(req, res) {
   const oldrefreshToken = req.cookies.refreshToken;
 
   if (!oldrefreshToken) {
-    return res.status(401).json({ Message: "Unauthorized Access" });
+    return res.status(401).json({ Message: "Refresh Token Not Found" });
   }
 
   try {
