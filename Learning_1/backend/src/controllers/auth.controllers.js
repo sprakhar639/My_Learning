@@ -192,4 +192,4 @@ async function logAll(req, res) {
     console.log(error);
   }
 }
-export { userRegister, refreshToken, logOut ,logAll};
+export { userRegister, refreshToken, logOut, logAll };
