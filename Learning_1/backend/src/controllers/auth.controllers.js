@@ -86,7 +86,7 @@ async function refreshToken(req, res) {
     const session = await SessionModel.findOne({
       refreshTokenHash: oldRefreshTokenHash,
       userId: decoded.id,
-      revoked:false
+      revoked: false,
     });
 
     if (!session) {
@@ -96,7 +96,7 @@ async function refreshToken(req, res) {
     }
 
     const newRefreshToken = jwt.sign(
-      { id: decoded.id },
+      { id: decoded.id, sessionId: session.id },
       process.env.JWT_SECRET,
       { expiresIn: "7d" },
     );
@@ -168,4 +168,28 @@ async function logOut(req, res) {
   }
 }
 
-export { userRegister, refreshToken, logOut };
+async function logAll(req, res) {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    return res.status(400).json({ message: "Token not found" });
+  }
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+
+    await SessionModel.updateMany(
+      { userId: decoded.id, revoked: false },
+      {
+        revoked: true,
+      },
+    );
+    res.clearCookie("refreshToken");
+
+    return res
+      .status(201)
+      .json({ message: "Logged Out from all Successfully" });
+  } catch (error) {
+    console.log(error);
+  }
+}
+export { userRegister, refreshToken, logOut ,logAll};
