@@ -68,6 +68,75 @@ async function userRegister(req, res) {
   });
 }
 
+async function logIn(req, res) {
+  try {
+    const { username, email, password } = req.body;
+
+    const user = await userModel
+      .findOne({
+        $or: [{ username }, { email }],
+      })
+      .select("+password");
+
+    if (!user) {
+      return res.status(404).json({ Message: "user not found" });
+    }
+
+    console.log("password from request:", password);
+    console.log("password from database:", user.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: "Invalid input" });
+    }
+
+    const refreshToken = jwt.sign(
+      {
+        id: user._id,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" },
+    );
+
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await SessionModel.create({
+      userId: user._id,
+      refreshTokenHash,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
+    const accessToken = jwt.sign(
+      {
+        id: user._id,
+        sessionId: session.id,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" },
+    );
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    const userObj = user.toObject();
+    delete userObj.password;
+
+    return res
+      .status(200)
+      .json({ message: "Logged in successfully", user: userObj, accessToken });
+  } catch (error) {
+    console.error(error, "Unauthorized Access");
+  }
+}
+
 async function refreshToken(req, res) {
   const oldrefreshToken = req.cookies.refreshToken;
 
@@ -192,4 +261,4 @@ async function logAll(req, res) {
     console.log(error);
   }
 }
-export { userRegister, refreshToken, logOut, logAll };
+export { userRegister, refreshToken, logOut, logAll, logIn };
