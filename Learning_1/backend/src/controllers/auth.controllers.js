@@ -1,8 +1,12 @@
 import userModel from "../models/user.model.js";
-import crypto from "crypto";
+import crypto, { createHash, Verify } from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import SessionModel from "../models/session.model.js";
+import { sendEmail } from "../services/email.service.js";
+import { generateOtp, getOtpHtml } from "../utils/utils.js";
+import { model } from "mongoose";
+import otpModel from "../models/otp.model.js";
 
 async function userRegister(req, res) {
   const { username, email, password } = req.body;
@@ -23,48 +27,24 @@ async function userRegister(req, res) {
     password: hash,
   });
 
-  const refreshToken = jwt.sign(
-    {
-      id: user._id,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" },
-  );
+  const otp = generateOtp();
+  const html = getOtpHtml(otp);
+  const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
 
-  const refreshTokenHash = crypto
-    .createHash("sha256")
-    .update(refreshToken)
-    .digest("hex");
-
-  const session = await SessionModel.create({
-    userId: user._id,
-    refreshTokenHash,
-    ip: req.ip,
-    userAgent: req.headers["user-agent"],
+  await otpModel.create({
+    email,
+    user,
+    otpHash,
   });
 
-  const accessToken = jwt.sign(
-    {
-      id: user._id,
-      sessionId: session.id,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "15m" },
-  );
-
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  await sendEmail(email, "OTP Verification", `Your OTP  code is ${otp}`, html);
 
   const userObj = user.toObject();
   delete userObj.password;
   return res.status(201).json({
     message: "User registered successfully",
     user: userObj,
-    accessToken,
+    verified: user.verified,
   });
 }
 
@@ -80,6 +60,10 @@ async function logIn(req, res) {
 
     if (!user) {
       return res.status(404).json({ Message: "user not found" });
+    }
+
+    if (!user.verified) {
+      return res.status(401).json({ message: "User not verified" });
     }
 
     console.log("password from request:", password);
@@ -261,4 +245,29 @@ async function logAll(req, res) {
     console.log(error);
   }
 }
-export { userRegister, refreshToken, logOut, logAll, logIn };
+
+async function verifyEmail(req, res) {
+  const { otp, email } = req.body;
+
+  const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+
+  const otpDoc = await otpModel.findOne({
+    otpHash,
+    email,
+  });
+
+  if (!otpDoc) {
+    return res.status(405).json({ message: "Otp woring or not found" });
+  }
+
+  const user = await userModel.findByIdAndUpdate(otpDoc.user, {
+    verified: true,
+  });
+
+  await otpModel.deleteMany({
+    user: otpDoc.user,
+  });
+
+  return res.status(201).json({ message: "Email Verfied Succeesfully" }, user);
+}
+export { userRegister, refreshToken, logOut, logAll, logIn, verifyEmail };

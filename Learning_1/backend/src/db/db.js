@@ -9,10 +9,10 @@ async function connectDB(){
     if(!process.env.JWT_SECRET){
         throw new Error("JWT_SECRET is not in env file")
     }
-    if(!process.env.GOOGLE_CLINT_ID){
+    if(!process.env.GOOGLE_CLIENT_ID){
         throw new Error("GOOGLE_CLINT_ID is not in env file")
     }
-    if(!process.env.GOOGLE_SECRET){
+    if(!process.env.GOOGLE_CLIENT_SECRET){
         throw new Error("GOOGLE_SECRET is not in env file")
     }
     if(!process.env.GOOGLE_REFRESH_TOKEN){
