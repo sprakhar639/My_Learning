@@ -1,0 +1,14 @@
+model user {
+  id    Int    @id @default(autoincrement())
+  username  String @unique
+  email String @unique
+  password String
+}
+
+
+model Product{
+id Int @id @default(autoincrement())
+name String
+price Float
+stock Int 
+}
